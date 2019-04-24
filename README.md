@@ -41,7 +41,7 @@ Python2.7 环境
 
 ```shell
 # 安装依赖库
-pip install flask flask-httpauth sqlite3
+pip install flask flask-httpauth
 # 参数说明：
 # -d 你的域名，需要指向ns记录到此服务器上，具体流程参考其他dnslog类的系统
 # -h 对外服务的IP，可不填，默认会自动获取外网IP
