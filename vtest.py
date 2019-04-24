@@ -429,7 +429,7 @@ def http_log(str):
         'ip': request.remote_addr
     }
     for k in data:
-        data[k] = data[k].replace("'", "\'")
+        data[k] = data[k].replace("'", "\\'")
     sql = "INSERT INTO http_log (url,headers,data,ip,insert_time) \
             VALUES('{url}', '{headers}', '{data}', '{ip}', datetime(CURRENT_TIMESTAMP,'localtime'))".format(**data)
     DB.exec_sql(sql)
@@ -485,10 +485,10 @@ def mock_list():
                 k, v = h.split(':', 1)
                 headers[k.strip()] = v.strip()
         data = {
-            'name': args.get('name', 'test').replace("'", "\'"),
+            'name': args.get('name', 'test').replace("'", "\\'"),
             'code': int(args.get('code', 200)),
-            'headers': json.dumps(headers),
-            'body': args.get('body', '').replace("'", "\'")
+            'headers': json.dumps(headers).replace("'", "\\'"),
+            'body': args.get('body', '').replace("'", "\\'")
         }
         sql = "INSERT INTO mock (name,code,headers,body,insert_time) \
             VALUES('{name}', {code}, '{headers}', '{body}', datetime(CURRENT_TIMESTAMP,'localtime'))".format(**data)
@@ -537,7 +537,7 @@ def xss(name, action):
             'source_ip': request.remote_addr
         }
         for k in data:
-            data[k] = data[k].replace("'", "\'")
+            data[k] = data[k].replace("'", "\\'")
         sql = "INSERT INTO xss (name,location,toplocation,opener,cookie,source_ip,insert_time) \
             VALUES('{name}', '{location}', '{toplocation}','{opener}' ,'{cookie}', '{source_ip}', datetime(CURRENT_TIMESTAMP,'localtime'))".format(**data)
         DB.exec_sql(sql)
