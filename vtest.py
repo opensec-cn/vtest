@@ -41,6 +41,7 @@ HTML_TMEPLATE = '''
                 pagination: true,
                 sidePagination: 'server',
                 search: true,
+                escape: true,
                 columns: [{
                     field: 'domain',
                     title: 'Query'
@@ -57,6 +58,7 @@ HTML_TMEPLATE = '''
                 pagination: true,
                 sidePagination: 'server',
                 search: true,
+                escape: true,
                 columns: [{
                     field: 'url',
                     title: 'URL'
@@ -78,6 +80,7 @@ HTML_TMEPLATE = '''
                 url: '/mock',
                 pagination: true,
                 sidePagination: 'server',
+                escape: true,
                 columns: [{
                     field: 'url',
                     title: 'Mock URL'
@@ -99,6 +102,7 @@ HTML_TMEPLATE = '''
                 url: '/xss',
                 pagination: true,
                 sidePagination: 'server',
+                escape: true,
                 columns: [{
                     field: 'name',
                     title: 'Name'
@@ -484,7 +488,7 @@ def mock_list():
             'name': args.get('name', 'test').replace("'", "\'"),
             'code': int(args.get('code', 200)),
             'headers': json.dumps(headers),
-            'body': args.get('body', '')
+            'body': args.get('body', '').replace("'", "\'")
         }
         sql = "INSERT INTO mock (name,code,headers,body,insert_time) \
             VALUES('{name}', {code}, '{headers}', '{body}', datetime(CURRENT_TIMESTAMP,'localtime'))".format(**data)
