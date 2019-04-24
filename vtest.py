@@ -609,4 +609,4 @@ Usage: python vtest.py -d yourdomain.com [-h 123.123.123.123] [-p password]
         LOCAL_IP = addr
     DB = sqlite()
     thread.start_new_thread(dns, ())
-    app.run('0.0.0.0', 80)
+    app.run('0.0.0.0', 80, threaded=True)
