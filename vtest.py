@@ -228,6 +228,7 @@ HTML_TMEPLATE = '''
 </html>
 '''
 
+
 @auth.verify_password
 def verify_pw(username, password):
     print(username, password)
@@ -287,11 +288,11 @@ class sqlite:
         cursor.close()
         self.conn.commit()
 
-    def exec_sql(self, sql):
+    def exec_sql(self, sql, *arg):
         # print sql
         result = []
         cursor = self.conn.cursor()
-        rows = cursor.execute(sql)
+        rows = cursor.execute(sql, arg)
         for v in rows:
             result.append(v)
         cursor.close()
@@ -373,8 +374,9 @@ class DNSUDPHandler(SocketServer.BaseRequestHandler):
             if ROOT_DOMAIN in domain:
                 name = domain.replace('.' + ROOT_DOMAIN, '')
                 sql = "INSERT INTO dns_log (name,domain,ip,insert_time) \
-                    VALUES('{name}', '{domain}', '{ip}', datetime(CURRENT_TIMESTAMP,'localtime'))".format(name=name, domain=domain, ip=ip)
-                DB.exec_sql(sql)
+                    VALUES(?, ?, ?, datetime(CURRENT_TIMESTAMP,'localtime'))"
+
+                DB.exec_sql(sql, name, domain, ip)
             dns.setip(ip)
             print '%s: %s-->%s' % (self.client_address[0], name, ip)
             socket_u.sendto(dns.getbytes(), self.client_address)
@@ -421,18 +423,16 @@ def dns_list():
 
 @app.route('/httplog/<str>', methods=['GET', 'POST', 'PUT'])
 def http_log(str):
-    print(request.url, request.data, request.remote_addr, dict(request.headers))
-    data = {
-        'url': request.url,
-        'headers': json.dumps(dict(request.headers)),
-        'data': request.data,
-        'ip': request.remote_addr
-    }
-    for k in data:
-        data[k] = data[k].replace("'", "\\'")
+    print(request.url, request.data, request.remote_addr, dict(
+        request.headers))
+    args = [
+        request.url,
+        json.dumps(dict(request.headers)), request.data, request.remote_addr
+    ]
     sql = "INSERT INTO http_log (url,headers,data,ip,insert_time) \
-            VALUES('{url}', '{headers}', '{data}', '{ip}', datetime(CURRENT_TIMESTAMP,'localtime'))".format(**data)
-    DB.exec_sql(sql)
+            VALUES(?, ?, ?, ?, datetime(CURRENT_TIMESTAMP,'localtime'))"
+
+    DB.exec_sql(sql, *args)
     return 'success'
 
 
@@ -448,8 +448,13 @@ def http_log_list():
         skip=offset, limit=limit)
     rows = DB.exec_sql(sql)
     for v in rows:
-        result.append({'url': v[0], 'headers': v[1],
-                       'data': v[2], 'ip': v[3], 'insert_time': v[4]})
+        result.append({
+            'url': v[0],
+            'headers': v[1],
+            'data': v[2],
+            'ip': v[3],
+            'insert_time': v[4]
+        })
     sql = "SELECT COUNT(*) FROM http_log"
     rows = DB.exec_sql(sql)
     total = rows[0][0]
@@ -469,8 +474,19 @@ def mock_list():
             skip=offset, limit=limit)
         rows = DB.exec_sql(sql)
         for v in rows:
-            result.append({'url': 'http://mock.{domain}/mock/{name}'.format(domain=ROOT_DOMAIN,
-                                                                            name=v[0]), 'code': v[1], 'headers': v[2], 'body': v[3], 'insert_time': v[4]})
+            result.append({
+                'url':
+                'http://mock.{domain}/mock/{name}'.format(
+                    domain=ROOT_DOMAIN, name=v[0]),
+                'code':
+                v[1],
+                'headers':
+                v[2],
+                'body':
+                v[3],
+                'insert_time':
+                v[4]
+            })
         sql = "SELECT COUNT(*) FROM mock"
         rows = DB.exec_sql(sql)
         total = rows[0][0]
@@ -484,35 +500,29 @@ def mock_list():
             for h in headers_str.split('\n'):
                 k, v = h.split(':', 1)
                 headers[k.strip()] = v.strip()
-        data = {
-            'name': args.get('name', 'test').replace("'", "\\'"),
-            'code': int(args.get('code', 200)),
-            'headers': json.dumps(headers).replace("'", "\\'"),
-            'body': args.get('body', '').replace("'", "\\'")
-        }
+        args = [
+            args.get('name', 'test'),
+            int(args.get('code', 200)),
+            json.dumps(headers),
+            args.get('body', '')
+        ]
         sql = "INSERT INTO mock (name,code,headers,body,insert_time) \
-            VALUES('{name}', {code}, '{headers}', '{body}', datetime(CURRENT_TIMESTAMP,'localtime'))".format(**data)
-        DB.exec_sql(sql)
+            VALUES(?, ?, ?, ?, datetime(CURRENT_TIMESTAMP,'localtime'))"
+
+        DB.exec_sql(sql, *args)
         return redirect(url_for('index'))
 
 
 @app.route('/mock/<name>')
 def mock(name):
     print('GET', name)
-    data = {
-        'url': request.url,
-        'headers': json.dumps(dict(request.headers)),
-        'data': request.data,
-        'ip': request.remote_addr
-    }
-    for k in data:
-        data[k] = data[k].replace("'", "\'")
     sql1 = "INSERT INTO http_log (url,headers,data,ip,insert_time) \
-        VALUES('{url}', '{headers}', '{data}', '{ip}', datetime(CURRENT_TIMESTAMP,'localtime'))".format(**data)
-    DB.exec_sql(sql1)
-    sql = "SELECT code,headers,body FROM mock where name = '{name}'".format(
-        name=name.replace("'", ''))
-    rows = DB.exec_sql(sql)
+        VALUES(?, ?, ?, ?, datetime(CURRENT_TIMESTAMP,'localtime'))"
+
+    DB.exec_sql(sql1, request.url, json.dumps(dict(request.headers)),
+                request.data, request.remote_addr)
+    sql = "SELECT code,headers,body FROM mock where name = ?"
+    rows = DB.exec_sql(sql, name)
     if len(rows) >= 1:
         body = rows[0][2]
         headers = json.loads(rows[0][1])
@@ -528,19 +538,17 @@ def xss(name, action):
         return js_body
     elif action == 'save':
         args = request.values
-        data = {
-            'name': name,
-            'location': args.get('l', ''),
-            'toplocation': args.get('t', ''),
-            'opener': args.get('o', ''),
-            'cookie': args.get('c', ''),
-            'source_ip': request.remote_addr
-        }
-        for k in data:
-            data[k] = data[k].replace("'", "\\'")
+        data = [
+            name,
+            args.get('l', ''),
+            args.get('t', ''),
+            args.get('o', ''),
+            args.get('c', ''), request.remote_addr
+        ]
         sql = "INSERT INTO xss (name,location,toplocation,opener,cookie,source_ip,insert_time) \
-            VALUES('{name}', '{location}', '{toplocation}','{opener}' ,'{cookie}', '{source_ip}', datetime(CURRENT_TIMESTAMP,'localtime'))".format(**data)
-        DB.exec_sql(sql)
+            VALUES(?, ?, ?, ? ,?, ?, datetime(CURRENT_TIMESTAMP,'localtime'))"
+
+        DB.exec_sql(sql, *data)
         return 'success'
 
 
@@ -556,8 +564,14 @@ def xss_list():
         skip=offset, limit=limit)
     rows = DB.exec_sql(sql)
     for v in rows:
-        result.append({'name': v[0], 'location': v[1], 'other': v[2] + '\n' +
-                       v[3], 'cookie': v[4], 'source_ip': v[5], 'insert_time': v[6]})
+        result.append({
+            'name': v[0],
+            'location': v[1],
+            'other': v[2] + '\n' + v[3],
+            'cookie': v[4],
+            'source_ip': v[5],
+            'insert_time': v[6]
+        })
     sql = "SELECT COUNT(*) FROM xss"
     rows = DB.exec_sql(sql)
     total = rows[0][0]
