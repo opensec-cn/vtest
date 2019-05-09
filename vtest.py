@@ -423,12 +423,17 @@ def dns_list():
 
 @app.route('/httplog/<str>', methods=['GET', 'POST', 'PUT'])
 def http_log(str):
-    print(request.url, request.data, request.remote_addr, dict(
-        request.headers))
+    post_data = request.data
+    if post_data == '':
+        for k,v in request.form.items():
+            post_data += k +'=' + v + '&'
+        post_data = post_data[:-1]
     args = [
         request.url,
-        json.dumps(dict(request.headers)), request.data, request.remote_addr
+        json.dumps(dict(request.headers)), post_data, request.remote_addr
     ]
+    print(request.url, post_data, request.remote_addr, dict(
+        request.headers))
     sql = "INSERT INTO http_log (url,headers,data,ip,insert_time) \
             VALUES(?, ?, ?, ?, datetime(CURRENT_TIMESTAMP,'localtime'))"
 
