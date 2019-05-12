@@ -34,6 +34,17 @@
 用于测试储存型xss漏洞
 
 
+#### API
+新增api功能, 查询记录是否存在, 用于漏洞检测:
+
+- http://login.example.com/api/http?token=token&limit=1&offset=0&q=xxx
+- http://login.example.com/dns/http?token=token&limit=1&offset=0&q=xxx
+
+返回结果:
+
+```
+{"rows":[{"domain":"1.1.1.2.i.example.com","insert_time":"2019-05-12 08:58:01","ip":"1.1.1.2"}],"status":"1"}
+```
 
 ### 系统部署
 
@@ -43,7 +54,7 @@ Python2.7 环境
 # 安装依赖库
 pip install flask flask-httpauth
 # 参数说明：
-# -d 你的域名，需要指向ns记录到此服务器上，具体流程参考其他dnslog类的系统
+# -d 你的域名，需要指向ns记录到此服务器上，具体流程请看domain.md
 # -h 对外服务的IP，可不填，默认会自动获取外网IP
 # -p 系统登录密码，默认密码为admin，用户名固定为admin
 python vtest.py -d vultest.com -p admin333
