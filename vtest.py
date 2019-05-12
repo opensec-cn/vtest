@@ -460,10 +460,11 @@ def dns_list():
         search = args.get('search')
     else:
         search = ""
+    search = "%" + search + "%"
 
-    sql = "SELECT domain,ip,insert_time FROM dns_log where domain like '%{search}%' order by id desc limit {skip},{limit}".format(
-        skip=offset, limit=limit, search=search)
-    rows = DB.exec_sql(sql)
+    sql = "SELECT domain,ip,insert_time FROM dns_log where domain like ? order by id desc limit ?,?"
+    rows = DB.exec_sql(sql, search, offset, limit)
+    
     for v in rows:
         result.append({"domain": v[0], "ip": v[1], "insert_time": v[2]})
     sql = "SELECT COUNT(*) FROM dns_log"
@@ -661,19 +662,20 @@ def api_check(action):
     offset = int(args.get('offset', 0))
     limit = int(args.get('limit', 10))
     query = args.get('q', '')
+    query = "%" + query + "%"
 
     result = []
     if action == 'dns':
-        sql = "SELECT domain,ip,insert_time FROM dns_log where domain like '%{query}%' order by id desc limit {skip},{limit}".format(
-            skip=offset, limit=limit, query=query)
-        rows = DB.exec_sql(sql)
+        sql = "SELECT domain,ip,insert_time FROM dns_log where domain like ? order by id desc limit ?,?"
+        rows = DB.exec_sql(sql, query, offset, limit)
+
         for v in rows:
             result.append({"domain": v[0], "ip": v[1], "insert_time": v[2]})
 
     elif action == 'http':
-        sql = "SELECT url,headers,data,ip,insert_time FROM http_log where url like '%{query}%' order by id desc limit {skip},{limit}".format(
-            skip=offset, limit=limit, query=query)
-        rows = DB.exec_sql(sql)
+        sql = "SELECT url,headers,data,ip,insert_time FROM http_log where url like ? order by id desc limit ?,?"
+        rows = DB.exec_sql(sql, query, offset, limit)
+
         for v in rows:
             result.append({'url': v[0], 'headers': v[1],
                            'data': v[2], 'ip': v[3], 'insert_time': v[4]})
