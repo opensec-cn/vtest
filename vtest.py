@@ -473,8 +473,8 @@ def dns_list():
     return jsonify({'total': int(total), 'rows': result})
 
 
-@app.route('/httplog/<str>', methods=['GET', 'POST', 'PUT'])
-def http_log(str):
+@app.route('/httplog/<path:path>', methods=['GET', 'POST', 'PUT'])
+def http_log(path):
     post_data = request.data
     if post_data == '':
         for k,v in request.form.items():
