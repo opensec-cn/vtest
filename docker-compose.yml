@@ -1,0 +1,14 @@
+version: '2'
+services:
+  # 
+  vtest:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - DOMAIN=${DOMAIN}
+      - LOCALIP=${LOCALIP}
+      - PASSWORD=${PASSWORD}
+    ports:
+      - "80:80"
+      - "53:53/udp"

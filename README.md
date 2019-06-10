@@ -61,6 +61,18 @@ python vtest.py -d vultest.com -p admin333
 ```
 
 
+## IN DOCKER && DOCKER-COMPOSE
+
+run:
+
+```shell
+DOMAIN=vtest.vultest.com LOCALIP=127.0.0.1 PASSWORD=admin333 docker-compose up -d
+```
+
+log:
+
+![](img/2019-06-10-00-50-16.png)
+
 
 ### 界面图
 
