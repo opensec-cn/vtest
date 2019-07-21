@@ -713,11 +713,11 @@ Usage: python vtest.py -d yourdomain.com [-h 123.123.123.123] [-p password]
             API_TOKEN = md5("ded08972cead38d6ed8f485e5b65b4b6" + PASSWORD)
 
     if LOCAL_IP == '':
-        csock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        csock.connect(('8.8.8.8', 80))
-        (addr, _) = csock.getsockname()
-        csock.close()
-        LOCAL_IP = addr
+        sock = socket.create_connection(('ns1.dnspod.net', 6666), 20)
+        ip = sock.recv(16)
+        sock.close()
+        LOCAL_IP = ip
+        
     DB = sqlite()
     thread.start_new_thread(dns, ())
     app.run('0.0.0.0', 80, threaded=True)
